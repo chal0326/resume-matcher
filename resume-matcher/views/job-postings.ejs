@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Job Postings</title>
+</head>
+<body>
+    <h1>Job Postings</h1>
+    <% jobPostings.forEach(job => { %>
+        <div>
+            <h2><%= job.title %> at <%= job.company %></h2>
+            <p><%= job.description %></p>
+            <p>Required Skills: <%= job.required_skills %></p>
+            <a href="/match-resume/<%= job.id %>">Match Resume</a>
+        </div>
+    <% }); %>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Work History</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Add Work History</h1>
+    <form action="/add-work-history" method="POST">
+        <input type="text" name="company" placeholder="Company" required>
+        <input type="text" name="position" placeholder="Position" required>
+        <input type="date" name="start_date" required>
+        <input type="date" name="end_date">
+        
+        <div id="entries-container">
+            <div class="entry">
+                <textarea name="descriptions[]" placeholder="What did you do? (1-2 sentences)" required></textarea>
+                <input type="text" name="skills[]" placeholder="Skills (comma-separated)" required>
+            </div>
+        </div>
+        
+        <button type="button" id="add-entry">Add Another Entry For This Role</button>
+        <button type="submit">Add Work History</button>
+    </form>
+
+    <script>
+        $(document).ready(function() {
+            $('#add-entry').click(function() {
+                const newEntry = `
+                    <div class="entry">
+                        <textarea name="descriptions[]" placeholder="What did you do? (1-2 sentences)" required></textarea>
+                        <input type="text" name="skills[]" placeholder="Skills (comma-separated)" required>
+                    </div>
+                `;
+                $('#entries-container').append(newEntry);
+            });
+        });
+    </script>
+</body>
+</html>

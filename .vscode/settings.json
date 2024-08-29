@@ -1,0 +1,11 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "database": "${workspaceFolder:budibase}/resume-matcher/resume_matcher.db",
+            "name": "resume_matcher"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}

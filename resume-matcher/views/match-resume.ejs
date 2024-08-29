@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Match Resume</title>
+</head>
+<body>
+    <h1>Match Resume for <%= jobPosting.title %> at <%= jobPosting.company %></h1>
+    <h2>Job Description:</h2>
+    <p><%= jobPosting.description %></p>
+    <h2>Required Skills:</h2>
+    <p><%= jobPosting.required_skills %></p>
+    <h2>Your Matching Work History:</h2>
+    <% workHistory.forEach(entry => { %>
+        <div>
+            <h3><%= entry.position %> at <%= entry.company %></h3>
+            <p><%= entry.start_date %> - <%= entry.end_date %></p>
+            <p><%= entry.description %></p>
+            <p>Skills: <%= entry.skills %></p>
+            <p>Matched Skills: <%= entry.matchedSkills.join(', ') %></p>
+            <p>Match Percentage: <%= entry.matchPercentage.toFixed(2) %>%</p>
+        </div>
+    <% }); %>
+</body>
+</html>
