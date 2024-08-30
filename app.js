@@ -134,12 +134,52 @@ app.post('/login', async (req, res) => {
   }
 });
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', authenticateUser, async (req, res) => {
   if (!req.user) {
     return res.redirect('/login');
   }
-  res.locals.title = 'Dashboard';
-  res.render('dashboard', { title: 'Dashboard', user: req.user });
+
+  try {
+    console.log('Fetching work history for user:', req.user.id);
+
+    const { data: workHistory, error } = await supabase
+      .from('work_history')
+      .select(`
+        id,
+        company,
+        position,
+        start_date,
+        end_date,
+        work_history_entries (
+          id,
+          description,
+          skills
+        )
+      `)
+      .eq('user_id', req.user.id)
+      .order('start_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching work history:', error);
+      throw error;
+    }
+
+    console.log('Fetched work history:', workHistory);
+
+    res.render('dashboard', { 
+      title: 'Dashboard', 
+      user: req.user, 
+      workHistory: workHistory 
+    });
+  } catch (error) {
+    console.error('Error in dashboard route:', error);
+    res.status(500).render('dashboard', { 
+      title: 'Dashboard', 
+      user: req.user, 
+      workHistory: [],
+      error: 'Failed to fetch work history: ' + error.message
+    });
+  }
 });
 
 // Add this route to render the add-work-history page
@@ -174,11 +214,11 @@ app.post('/add-work-history', authenticateUser, async (req, res) => {
       })
       .select();
 
-      if (workHistoryError) {
-        console.error('Work history insert error:', workHistoryError);
-        throw workHistoryError;
-      }
-      console.log('Inserted work history:', workHistoryData); // Add this for debugging
+    if (workHistoryError) {
+      console.error('Work history insert error:', workHistoryError);
+      throw workHistoryError;
+    }
+    console.log('Inserted work history:', workHistoryData); // Add this for debugging
     const workHistoryId = workHistoryData[0].id;
 
     // Process and insert entries
@@ -212,15 +252,84 @@ app.get('/logout', (req, res) => {
   res.clearCookie('supabase-auth-token');
   res.redirect('/');
 });
-// Add this catch-all route at the end of your routes
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
-  res.status(404).render('404');
+
+// Get a single work history entry
+app.get('/work-history-entry/:id', authenticateUser, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('work_history_entries')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) throw error;
+
+    res.render('partials/work-history-entry', { entry: data });
+  } catch (error) {
+    console.error('Error fetching work history entry:', error);
+    res.status(500).send('Failed to fetch work history entry');
+  }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Update a work history entry
+app.put('/work-history-entry/:id', authenticateUser, async (req, res) => {
+  try {
+    const { description, skills } = req.body;
+    const { data, error } = await supabase
+      .from('work_history_entries')
+      .update({ description, skills: skills.split(',').map(s => s.trim()) })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.render('partials/work-history-entry', { entry: data });
+  } catch (error) {
+    console.error('Error updating work history entry:', error);
+    res.status(500).send('Failed to update work history entry');
+  }
+});
+
+// Delete a work history entry
+app.delete('/work-history-entry/:id', authenticateUser, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('work_history_entries')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (error) throw error;
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error deleting work history entry:', error);
+    res.status(500).send('Failed to delete work history entry');
+  }
+});
+
+// Add a new work history entry
+app.post('/work-history-entry', authenticateUser, async (req, res) => {
+  try {
+    const { description, skills, jobId } = req.body;
+    const { data, error } = await supabase
+      .from('work_history_entries')
+      .insert({
+        work_history_id: jobId,
+        description,
+        skills: skills.split(',').map(s => s.trim())
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.render('partials/work-history-entry', { entry: data });
+  } catch (error) {
+    console.error('Error adding work history entry:', error);
+    res.status(500).send('Failed to add work history entry');
+  }
+});
 
 // Add logout route
 app.get('/logout', (req, res) => {

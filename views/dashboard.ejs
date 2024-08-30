@@ -1,1 +1,165 @@
-<h1>Dashboard</h1>
+<h1>Welcome to your Dashboard, <%= user.user_metadata.name %></h1>
+
+<% if (locals.error) { %>
+  <div class="alert alert-danger"><%= error %></div>
+<% } %>
+
+<h2>Your Work History</h2>
+
+<% if (workHistory && workHistory.length > 0) { %>
+  <% workHistory.forEach(job => { %>
+    <div class="job-entry" data-job-id="<%= job.id %>">
+      <h3><%= job.position %> at <%= job.company %></h3>
+      <p>
+        <%= new Date(job.start_date).toLocaleDateString() %> - 
+        <%= job.end_date ? new Date(job.end_date).toLocaleDateString() : 'Present' %>
+      </p>
+      
+      <% if (job.work_history_entries && job.work_history_entries.length > 0) { %>
+        <h4>Responsibilities and Skills:</h4>
+        <ul class="entry-list">
+          <% job.work_history_entries.forEach(entry => { %>
+            <li class="entry-item" data-entry-id="<%= entry.id %>">
+              <div class="entry-content">
+                <%= entry.description %>
+                <br>
+                <strong>Skills:</strong> <%= entry.skills.join(', ') %>
+              </div>
+              <div class="entry-actions">
+                <button class="btn-edit-entry">Edit</button>
+                <button class="btn-delete-entry">Delete</button>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+      <button class="btn-add-entry">Add New Responsibility</button>
+    </div>
+  <% }) %>
+<% } else { %>
+  <p>You haven't added any work history yet.</p>
+<% } %>
+
+<a href="/add-work-history" class="btn btn-primary">Add New Work History</a>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+  // Edit entry
+  $('.btn-edit-entry').click(function() {
+    const entryItem = $(this).closest('.entry-item');
+    const entryId = entryItem.data('entry-id');
+    const entryContent = entryItem.find('.entry-content');
+    const description = entryContent.contents().first().text().trim();
+    const skills = entryContent.find('strong').next().text().trim();
+
+    entryContent.html(`
+      <form class="edit-entry-form">
+        <textarea name="description" required>${description}</textarea>
+        <input type="text" name="skills" value="${skills}" required>
+        <button type="submit">Save</button>
+        <button type="button" class="btn-cancel-edit">Cancel</button>
+      </form>
+    `);
+  });
+
+  // Cancel edit
+  $(document).on('click', '.btn-cancel-edit', function() {
+    const entryItem = $(this).closest('.entry-item');
+    const entryId = entryItem.data('entry-id');
+    // Reload the entry content from the server
+    $.get(`/work-history-entry/${entryId}`, function(data) {
+      entryItem.replaceWith(data);
+    });
+  });
+
+  // Save edited entry
+  $(document).on('submit', '.edit-entry-form', function(e) {
+    e.preventDefault();
+    const entryItem = $(this).closest('.entry-item');
+    const entryId = entryItem.data('entry-id');
+    const formData = $(this).serialize();
+
+    $.ajax({
+      url: `/work-history-entry/${entryId}`,
+      method: 'PUT',
+      data: formData,
+      success: function(data) {
+        entryItem.replaceWith(data);
+      },
+      error: function(xhr, status, error) {
+        console.error('AJAX error:', status, error);
+        alert('An error occurred: ' + xhr.responseText);
+      }
+    });
+  });
+
+  // Delete entry
+  $('.btn-delete-entry').click(function() {
+    if (confirm('Are you sure you want to delete this entry?')) {
+      const entryItem = $(this).closest('.entry-item');
+      const entryId = entryItem.data('entry-id');
+
+      $.ajax({
+        url: `/work-history-entry/${entryId}`,
+        method: 'DELETE',
+        success: function() {
+          entryItem.remove();
+        },
+        error: function(xhr, status, error) {
+        console.error('AJAX error:', status, error);
+        alert('An error occurred: ' + xhr.responseText);
+      }
+      });
+    }
+  });
+
+  // Add new entry
+  $('.btn-add-entry').click(function() {
+    const jobEntry = $(this).closest('.job-entry');
+    const jobId = jobEntry.data('job-id');
+    const entryList = jobEntry.find('.entry-list');
+
+    const newEntryForm = `
+      <li class="entry-item new-entry">
+        <form class="add-entry-form">
+          <textarea name="description" placeholder="Job responsibility" required></textarea>
+          <input type="text" name="skills" placeholder="Skills (comma-separated)" required>
+          <button type="submit">Add</button>
+          <button type="button" class="btn-cancel-add">Cancel</button>
+        </form>
+      </li>
+    `;
+
+    entryList.append(newEntryForm);
+  });
+
+  // Cancel add new entry
+  $(document).on('click', '.btn-cancel-add', function() {
+    $(this).closest('.new-entry').remove();
+  });
+
+  // Submit new entry
+  $(document).on('submit', '.add-entry-form', function(e) {
+    e.preventDefault();
+    const jobEntry = $(this).closest('.job-entry');
+    const jobId = jobEntry.data('job-id');
+    const formData = $(this).serialize() + `&jobId=${jobId}`;
+
+    $.ajax({
+      url: '/work-history-entry',
+      method: 'POST',
+      data: formData,
+      success: function(data) {
+        const entryList = jobEntry.find('.entry-list');
+        entryList.append(data);
+        $('.new-entry').remove();
+      },
+      error: function(xhr, status, error) {
+        console.error('AJAX error:', status, error);
+        alert('An error occurred: ' + xhr.responseText);
+      }
+    });
+  });
+});
+</script>
