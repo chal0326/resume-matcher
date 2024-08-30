@@ -1,0 +1,10 @@
+<h1>Register</h1>
+<% if (locals.error) { %>
+  <div class="alert alert-danger"><%= error %></div>
+<% } %>
+<form action="/register" method="POST">
+  <input type="text" name="name" placeholder="Name" required>
+  <input type="email" name="email" placeholder="Email" required>
+  <input type="password" name="password" placeholder="Password" required>
+  <button type="submit">Register</button>
+</form>
