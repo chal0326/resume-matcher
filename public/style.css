@@ -1,0 +1,19 @@
+ <style>
+ .job-entry {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+  .job-entry h3 {
+    margin-top: 0;
+  }
+  .btn-primary {
+    display: inline-block;
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+  }
+</style>

@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Work History</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-</head>
-<body>
     <h1>Add Work History</h1>
-    <form action="/add-work-history" method="POST">
+    <% if (locals.error) { %>
+      <div class="alert alert-danger"><%= error %></div>
+    <% } %>
+    <form action="/add-work-history" method="POST" id="work-history-form">
         <input type="text" name="company" placeholder="Company" required>
         <input type="text" name="position" placeholder="Position" required>
         <input type="date" name="start_date" required>
@@ -20,21 +16,42 @@
         </div>
         
         <button type="button" id="add-entry">Add Another Entry For This Role</button>
-        <button type="submit">Add Work History</button>
+        <button type="submit">Submit Work History</button>
     </form>
 
     <script>
-        $(document).ready(function() {
-            $('#add-entry').click(function() {
-                const newEntry = `
-                    <div class="entry">
-                        <textarea name="descriptions[]" placeholder="What did you do? (1-2 sentences)" required></textarea>
-                        <input type="text" name="skills[]" placeholder="Skills (comma-separated)" required>
-                    </div>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('work-history-form');
+            const addEntryButton = document.getElementById('add-entry');
+            const entriesContainer = document.getElementById('entries-container');
+
+            addEntryButton.addEventListener('click', function() {
+                const newEntry = document.createElement('div');
+                newEntry.className = 'entry';
+                newEntry.innerHTML = `
+                    <textarea name="descriptions[]" placeholder="What did you do? (1-2 sentences)" required></textarea>
+                    <input type="text" name="skills[]" placeholder="Skills (comma-separated)" required pattern="^(\s*[A-Za-z]+\s*,\s*)*(\s*[A-Za-z]+\s*)$">
                 `;
-                $('#entries-container').append(newEntry);
+                entriesContainer.appendChild(newEntry);
+            });
+
+            form.addEventListener('submit', function(e) {
+                const skillInputs = form.querySelectorAll('input[name="skills[]"]');
+                let isValid = true;
+
+                skillInputs.forEach(function(input) {
+                    const skills = input.value.split(',').map(s => s.trim()).filter(s => s !== '');
+                    if (skills.length === 0) {
+                        isValid = false;
+                        input.setCustomValidity('Please enter at least one skill');
+                    } else {
+                        input.setCustomValidity('');
+                    }
+                });
+
+                if (!isValid) {
+                    e.preventDefault();
+                }
             });
         });
     </script>
-</body>
-</html>

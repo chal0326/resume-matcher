@@ -1,0 +1,11 @@
+<li class="entry-item" data-entry-id="<%= entry.id %>">
+  <div class="entry-content">
+    <%= entry.description %>
+    <br>
+    <strong>Skills:</strong> <%= entry.skills.join(', ') %>
+  </div>
+  <div class="entry-actions">
+    <button class="btn-edit-entry">Edit</button>
+    <button class="btn-delete-entry">Delete</button>
+  </div>
+</li>
