@@ -45,7 +45,12 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function() {
-  // Edit entry
+  function showLoading(element) {
+    element.append('<div class="loading">Loading...</div>');
+  }
+  function hideLoading(element) {
+    element.find('.loading').remove();
+  }// Edit entry
   $('.btn-edit-entry').click(function() {
     const entryItem = $(this).closest('.entry-item');
     const entryId = entryItem.data('entry-id');
@@ -80,6 +85,8 @@ $(document).ready(function() {
     const entryId = entryItem.data('entry-id');
     const formData = $(this).serialize();
 
+    showLoading(entryItem);
+  
     $.ajax({
       url: `/work-history-entry/${entryId}`,
       method: 'PUT',
@@ -99,6 +106,9 @@ $(document).ready(function() {
     if (confirm('Are you sure you want to delete this entry?')) {
       const entryItem = $(this).closest('.entry-item');
       const entryId = entryItem.data('entry-id');
+
+      showLoading(entryItem);
+
 
       $.ajax({
         url: `/work-history-entry/${entryId}`,
@@ -146,6 +156,8 @@ $(document).ready(function() {
     const jobId = jobEntry.data('job-id');
     const formData = $(this).serialize() + `&jobId=${jobId}`;
 
+    showLoading(jobEntry);
+    
     $.ajax({
       url: '/work-history-entry',
       method: 'POST',
