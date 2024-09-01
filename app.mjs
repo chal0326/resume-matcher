@@ -1,147 +1,91 @@
-require('dotenv').config();
-const express = require('express');
-const expressLayouts = require('express-ejs-layouts');
-const { createClient } = require('@supabase/supabase-js');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-
+import dotenv from 'dotenv/config';
+import express from 'express';
+import expressLayouts from 'express-ejs-layouts';
+import { createClient } from '@supabase/supabase-js';
+import cookieParser from 'cookie-parser';
+import axios from 'axios';
+import { OpenAI } from 'openai';
+import cors from 'cors';
 const app = express();
-
 // Supabase setup
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 // EJS setup
 app.use(expressLayouts);
 app.set('view engine', 'ejs');
-app.set('layout', 'layout'); // This tells express to use layout.ejs as the default layout
+app.set('layout', 'layout');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Add this function before you use it in any routes
+// Middleware to check authentication
 async function authenticateUser(req, res, next) {
-  const token = req.cookies['supabase-auth-token'];
-  if (!token) {
-    req.user = null;
-    return next();
-  }
-
-  try {
-    // First, try to get the user with the existing token
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error && error.message.includes('token is expired')) {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession({ refresh_token: token });
-      if (refreshError) {
-        res.clearCookie('supabase-auth-token');
-        req.user = null;
-      } else {
-        res.cookie('supabase-auth-token', refreshData.session.access_token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          maxAge: 60 * 60 * 24 * 7 * 1000 // 1 week
-        });
-        req.user = refreshData.user;
-      }
-    } else if (error) {
-      res.clearCookie('supabase-auth-token');
-      req.user = null;
-    } else {
-      req.user = user;
-    }
-  } catch (error) {
-    console.error('Authentication error:', error);
-    res.clearCookie('supabase-auth-token');
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session) {
+    req.user = session.user;
+  } else {
     req.user = null;
   }
+  
   next();
 }
-
+app.use(cors());
+app.use(express.json());
 app.use(authenticateUser);
 
-// Add this after your other middleware setup
 app.use((req, res, next) => {
-  res.locals.user = req.user || null;
+  res.locals.user = req.user;
   res.locals.title = 'Resume Matcher';
   next();
 });
-
-// Add this new route for the home page
+const port = process.env.PORT || 3000;
+// Routes
 app.get('/', (req, res) => {
-  res.locals.title = 'Home'; 
-  res.render('home', { title: 'Home', user: req.user });
+  res.render('home', { title: 'Home' });
 });
 
 app.get('/register', (req, res) => {
-  res.locals.title = 'Register';
-  res.render('register', { title: 'Register', user: req.user });
+  res.render('register', { title: 'Register' });
 });
 
 app.post('/register', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-    const { data, error } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-      options: {
-        data: { name: name }
-      }
-    });
+  const { email, password, name } = req.body;
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { name } }
+  });
 
-    if (error) throw error;
-
-    console.log('User registered successfully:', data);
+  if (error) {
+    res.status(500).render('register', { title: 'Register', error: error.message });
+  } else {
     res.redirect('/login');
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed', details: error.message });
   }
 });
 
 app.get('/login', (req, res) => {
-  res.locals.title = 'Login';
-  res.render('login', { title: 'Login', user: req.user });
+  res.render('login', { title: 'Login' });
 });
 
 app.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
+  const { email, password } = req.body;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) throw error;
-
-    // Set both access token and refresh token in cookies
-    res.cookie('supabase-auth-token', data.session.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7 * 1000 // 1 week
-    });
-    res.cookie('supabase-refresh-token', data.session.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30 * 1000 // 30 days
-    });
-
+  if (error) {
+    res.status(400).render('login', { title: 'Login', error: 'Invalid credentials' });
+  } else {
     res.redirect('/dashboard');
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(400).render('login', { title: 'Login', error: 'Invalid credentials', user: null });
   }
 });
 
-app.get('/dashboard', authenticateUser, async (req, res) => {
+app.get('/dashboard', async (req, res) => {
   if (!req.user) {
     return res.redirect('/login');
   }
 
   try {
-    console.log('Fetching work history for user:', req.user.id);
-
     const { data: workHistory, error } = await supabase
       .from('work_history')
       .select(`
@@ -159,23 +103,16 @@ app.get('/dashboard', authenticateUser, async (req, res) => {
       .eq('user_id', req.user.id)
       .order('start_date', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching work history:', error);
-      throw error;
-    }
-
-    console.log('Fetched work history:', workHistory);
+    if (error) throw error;
 
     res.render('dashboard', { 
-      title: 'Dashboard', 
-      user: req.user, 
-      workHistory: workHistory 
+      title: 'Dashboard',
+      workHistory
     });
   } catch (error) {
     console.error('Error in dashboard route:', error);
     res.status(500).render('dashboard', { 
-      title: 'Dashboard', 
-      user: req.user, 
+      title: 'Dashboard',
       workHistory: [],
       error: 'Failed to fetch work history: ' + error.message
     });
@@ -248,9 +185,10 @@ app.post('/add-work-history', authenticateUser, async (req, res) => {
   }
 });
 
-app.get('/logout', (req, res) => {
-  res.clearCookie('supabase-auth-token');
-  res.redirect('/');
+app.get('/logout', async (req, res) => {
+  const { error } = await supabase.auth.signOut();
+  if (error) console.error('Error during sign out:', error);
+  res.redirect('/login');
 });
 
 // Get a single work history entry
@@ -276,7 +214,7 @@ app.put('/work-history-entry/:id', authenticateUser, async (req, res) => {
   try {
     const { description, skills } = req.body;
     const { data, error } = await supabase
-      .from('work_history_entries')
+      .from ('work_history_entries')
       .update({ description, skills: skills.split(',').map(s => s.trim()) })
       .eq('id', req.params.id)
       .select()
@@ -331,8 +269,127 @@ app.post('/work-history-entry', authenticateUser, async (req, res) => {
   }
 });
 
-// Add logout route
-app.get('/logout', (req, res) => {
-  res.clearCookie('supabase-auth-token');
-  res.redirect('/login');
+// Initialize OpenAI client
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Get all job listings
+app.get('/job-listings', authenticateUser, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('job_listings')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.render('job-listings', { title: 'Job Listings', jobListings: data });
+  } catch (error) {
+    console.error('Error fetching job listings:', error);
+    res.status(500).render('job-listings', { 
+      title: 'Job Listings',
+      jobListings: [],
+      error: 'Failed to fetch job listings: ' + error.message
+    });
+  }
 });
+
+// Add a new job listing
+app.post('/job-listings', authenticateUser, async (req, res) => {
+  try {
+    const { title, company, description, requirements, location, salary_range } = req.body;
+    const { data, error } = await supabase
+      .from('job_listings')
+      .insert({ title, company, description, requirements, location, salary_range })
+      .select();
+
+    if (error) throw error;
+
+    res.redirect('/job-listings');
+  } catch (error) {
+    console.error('Error adding job listing:', error);
+    res.status(500).render('add-job-listing', { 
+      title: 'Add Job Listing',
+      error: 'Failed to add job listing: ' + error.message
+    });
+  }
+});
+
+// Match resume to job listing
+app.post('/match-resume', authenticateUser, async (req, res) => {
+  try {
+    const { jobListingId } = req.body;
+    const userId = req.user.id;
+
+    // Fetch job listing
+    const { data: jobListing, error: jobError } = await supabase
+      .from('job_listings')
+      .select('*')
+      .eq('id', jobListingId)
+      .single();
+
+    if (jobError) throw jobError;
+
+    // Fetch user's work history
+    const { data: workHistory, error: workError } = await supabase
+      .from('work_history')
+      .select(`
+        company,
+        position,
+        work_history_entries (
+          description,
+          skills
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (workError) throw workError;
+
+    // Prepare resume and job description for AI analysis
+    const resume = workHistory.map(job => `
+      Company: ${job.company}
+      Position: ${job.position}
+      ${job.work_history_entries.map(entry => `
+        Description: ${entry.description}
+        Skills: ${entry.skills.join(', ')}
+      `).join('\n')}
+    `).join('\n\n');
+
+    const jobDescription = `
+      Title: ${jobListing.title}
+      Company: ${jobListing.company}
+      Description: ${jobListing.description}
+      Requirements: ${jobListing.requirements.join(', ')}
+    `;
+
+    // Use OpenAI to analyze the match
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a helpful assistant that analyzes resumes and job descriptions to determine how well they match." },
+        { role: "user", content: `Please analyze this resume and job description, and provide a percentage match along with a brief explanation of the strengths and weaknesses of the match. Resume: ${resume} Job Description: ${jobDescription}` }
+      ],
+    });
+
+    const aiAnalysis = completion.choices[0].message.content;
+
+    res.render('match-result', { title: 'Match Result', aiAnalysis });
+  } catch (error) {
+    console.error('Error matching resume:', error);
+    res.status(500).render('error', { 
+      title: 'Error',
+      error: 'Failed to match resume: ' + error.message
+    });
+  }
+});
+app.get('/add-job-listing', authenticateUser, (req, res) => 
+  { res.render('add-job-listing', { title: 'Add Job Listing' });});
+
+app.get('/', (req, res) => {
+  res.send('AI Resume Tool API is running!');
+});
+
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
+
+export default app;

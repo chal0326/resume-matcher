@@ -40,7 +40,7 @@
                 let isValid = true;
 
                 skillInputs.forEach(function(input) {
-                    const skills = input.value.split(',').map(s => s.trim()).filter(s => s !== '');
+                    const skills =input.value.split(',').map(s => s.trim()).filter(s => s !== '');
                     if (skills.length === 0) {
                         isValid = false;
                         input.setCustomValidity('Please enter at least one skill');

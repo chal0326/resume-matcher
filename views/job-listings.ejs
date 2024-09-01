@@ -1,0 +1,19 @@
+    <h1>Job Listings</h1>
+    <% jobListings.forEach(job => { %>
+        <div>
+            <h2><%= job.title %> at <%= job.company %></h2>
+            <p><%= job.description %></p>
+            <p>Required Skills: <%= job.required_skills %></p>
+            <a href="/match-resume/<%= job.id %>">Match Resume</a>
+        </div>
+    <% }); %>
+    <h1>Job Listings</h1>
+    <a href="/add-job-listing" class="btn btn-primary">Add New Job Listing</a>
+    <% if (jobListings.length === 0) { %>
+        <p>No job listings available.</p>
+    <% } else { %>
+        <% jobListings.forEach(job => { %>
+            <div class="job-listing">
+                <h2><%= job.title %> at <%= job.company %></h2>
+                <p><strong>Description:</strong> <%= job.description %></p>
+                <p><strong>Requirements:</strong> <%= job.requirements.join(', ') %></p>

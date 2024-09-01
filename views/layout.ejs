@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= typeof title !== 'undefined' ? title : 'Resume Matcher' %></title>
+    <title><%= title || 'Resume Matcher' %></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .job-entry {
@@ -75,10 +75,12 @@
         <div class="container">
             <a class="navbar-brand" href="/">Resume Matcher</a>
             <div class="navbar-nav">
-                <% if (typeof user !== 'undefined' && user) { %>
+                <% if (user) { %>
                     <a class="nav-link" href="/dashboard">Dashboard</a>
                     <a class="nav-link" href="/add-work-history">Add Work History</a>
-                    <a class="nav-link" href="/job-postings">Job Postings</a>
+                    <a class="nav-link" href="/job-listings">Job Listings</a>
+                    <a class="nav-link" href="/add-job-listing">Add Job Listing</a>
+                    <a class="nav-link" href="/match-resume">Match Resume</a>
                     <a class="nav-link" href="/logout">Logout</a>
                 <% } else { %>
                     <a class="nav-link" href="/login">Login</a>
@@ -92,6 +94,20 @@
         <%- body %>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const supabase = supabase.createClient('<YOUR_SUPABASE_URL>', '<YOUR_SUPABASE_ANON_KEY>');
+        
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN') {
+                console.log('User signed in:', session.user);
+                // You can update UI elements here if needed
+            } else if (event === 'SIGNED_OUT') {
+                console.log('User signed out');
+                // You can update UI elements here if needed
+            }
+        });
+    </script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
