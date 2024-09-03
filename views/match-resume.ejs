@@ -1,17 +1,33 @@
+    <h1>Match Resume to Job Listing</h1>
+    <form id="matchForm">
+        <label for="jobListingId">Select Job Listing:</label>
+        <select id="jobListingId" name="jobListingId" required>
+            <% jobListings.forEach(job => { %>
+                <option value="<%= job.id %>"><%= job.title %> at <%= job.company %></option>
+            <% }); %>
+        </select>
+        <button type="submit">Match Resume</button>
+    </form>
 
-    <h1>Match Resume for <%= jobListing.title %> at <%= jobListing.company %></h1>
-    <h2>Job Description:</h2>
-    <p><%= jobListing.description %></p>
-    <h2>Required Skills:</h2>
-    <p><%= jobListing.required_skills %></p>
-    <h2>Your Matching Work History:</h2>
-    <% workHistory.forEach(entry => { %>
-        <div>
-            <h3><%= entry.position %> at <%= entry.company %></h3>
-            <p><%= entry.start_date %> - <%= entry.end_date %></p>
-            <p><%= entry.description %></p>
-            <p>Skills: <%= entry.skills %></p>
-            <p>Matched Skills: <%= entry.matchedSkills.join(', ') %></p>
-            <p>Match Percentage: <%= entry.matchPercentage.toFixed(2) %>%</p>
-        </div>
-    <% }); %>
+    <div id="matchResult" style="display: none;">
+        <h2>Match Result</h2>
+        <pre id="aiAnalysis"></pre>
+    </div>
+
+    <script>
+        document.getElementById('matchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const jobListingId = document.getElementById('jobListingId').value;
+            const matchResult = document.getElementById('matchResult');
+            const aiAnalysis = document.getElementById('aiAnalysis');
+
+            try {
+                const response = await axios.post('/match-resume', { jobListingId });
+                aiAnalysis.textContent = response.data.aiAnalysis;
+                matchResult.style.display = 'block';
+            } catch (error) {
+                console.error('Error matching resume:', error);
+                alert('Failed to match resume. Please try again.');
+            }
+        });
+    </script>

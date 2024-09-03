@@ -107,14 +107,16 @@ app.get('/dashboard', async (req, res) => {
 
     res.render('dashboard', { 
       title: 'Dashboard',
-      workHistory
+      workHistory,
+      user: req.user
     });
   } catch (error) {
     console.error('Error in dashboard route:', error);
     res.status(500).render('dashboard', { 
       title: 'Dashboard',
       workHistory: [],
-      error: 'Failed to fetch work history: ' + error.message
+      error: 'Failed to fetch work history: ' + error.message,
+      user: req.user
     });
   }
 });
@@ -190,7 +192,8 @@ app.get('/logout', async (req, res) => {
   if (error) console.error('Error during sign out:', error);
   res.redirect('/login');
 });
-
+app.get('/add-job-listing', authenticateUser, (req, res) => 
+  { res.render('add-job-listing', { title: 'Add Job Listing' });});
 // Get a single work history entry
 app.get('/work-history-entry/:id', authenticateUser, async (req, res) => {
   try {
@@ -270,7 +273,23 @@ app.post('/work-history-entry', authenticateUser, async (req, res) => {
 });
 
 // Initialize OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const token = process.env.OPENAI_API_KEY;
+const endpoint = "https://models.inference.ai.azure.com";
+const modelName = "gpt-4o-mini";
+
+function analyzeResumeMatch({ resume, jobDescription }) {
+  // This function simulates the AI analysis
+  // In a real scenario, this would be more complex
+  return JSON.stringify({
+    percentageMatch: "75%",
+    strengths: "Strong technical skills matching job requirements",
+    weaknesses: "Limited experience in the specific industry"
+  });
+}
+
+const namesToFunctions = {
+  analyzeResumeMatch: (data) => analyzeResumeMatch(data),
+};
 
 // Get all job listings
 app.get('/job-listings', authenticateUser, async (req, res) => {
@@ -314,6 +333,24 @@ app.post('/job-listings', authenticateUser, async (req, res) => {
   }
 });
 
+app.get('/match-resume', authenticateUser, async (req, res) => {
+  try {
+    const { data: jobListings, error } = await supabase
+      .from('job_listings')
+      .select('id, title, company')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.render('match-resume', { title: 'Match Resume', jobListings });
+  } catch (error) {
+    console.error('Error fetching job listings:', error);
+    res.status(500).render('error', { 
+      title: 'Error',
+      error: 'Failed to fetch job listings: ' + error.message
+    });
+  }
+});
 // Match resume to job listing
 app.post('/match-resume', authenticateUser, async (req, res) => {
   try {
@@ -361,28 +398,82 @@ app.post('/match-resume', authenticateUser, async (req, res) => {
       Requirements: ${jobListing.requirements.join(', ')}
     `;
 
-    // Use OpenAI to analyze the match
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: "You are a helpful assistant that analyzes resumes and job descriptions to determine how well they match." },
-        { role: "user", content: `Please analyze this resume and job description, and provide a percentage match along with a brief explanation of the strengths and weaknesses of the match. Resume: ${resume} Job Description: ${jobDescription}` }
-      ],
+    const tool = {
+      "type": "function",
+      "function": {
+        name: "analyzeResumeMatch",
+        description: "Analyzes a resume against a job description and provides a match percentage and analysis.",
+        parameters: {
+          "type": "object",
+          "properties": {
+            "resume": {
+              "type": "string",
+              "description": "The user's resume",
+            },
+            "jobDescription": {
+              "type": "string", 
+              "description": "The job description",
+            },
+          },
+          "required": ["resume", "jobDescription"],
+        }
+      }
+    };
+
+    const client = new OpenAI({ baseURL: endpoint, apiKey: token });
+
+    let messages = [
+      { role: "system", content: "You are an AI assistant that analyzes resumes and job descriptions to determine how well they match." },
+      { role: "user", content: `Analyze this resume and job description. Provide a percentage match and a brief explanation of the strengths and weaknesses of the match. Resume: ${resume} Job Description: ${jobDescription}` },
+    ];
+
+    let response = await client.chat.completions.create({
+      messages: messages,
+      tools: [tool],
+      model: modelName
     });
 
-    const aiAnalysis = completion.choices[0].message.content;
+    let aiAnalysis = "";
 
-    res.render('match-result', { title: 'Match Result', aiAnalysis });
+    if (response.choices[0].finish_reason === "tool_calls") {
+      messages.push(response.choices[0].message);
+
+      if (response.choices[0].message && response.choices[0].message.tool_calls.length === 1) {
+        const toolCall = response.choices[0].message.tool_calls[0];
+        if (toolCall.type === "function") {
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          console.log(`Calling function \`${toolCall.function.name}\` with arguments ${toolCall.function.arguments}`);
+          const callableFunc = namesToFunctions[toolCall.function.name];
+          const functionReturn = callableFunc(functionArgs);
+          console.log(`Function returned = ${functionReturn}`);
+
+          messages.push({
+            "tool_call_id": toolCall.id,
+            "role": "tool",
+            "name": toolCall.function.name,
+            "content": functionReturn,
+          });
+
+          response = await client.chat.completions.create({
+            messages: messages,
+            tools: [tool],
+            model: modelName
+          });
+
+          aiAnalysis = response.choices[0].message.content;
+        }
+      }
+    } else {
+      aiAnalysis = response.choices[0].message.content;
+    }
+
+    res.json({ aiAnalysis });
   } catch (error) {
     console.error('Error matching resume:', error);
-    res.status(500).render('error', { 
-      title: 'Error',
-      error: 'Failed to match resume: ' + error.message
-    });
+    res.status(500).json({ error: 'Failed to match resume: ' + error.message });
   }
 });
-app.get('/add-job-listing', authenticateUser, (req, res) => 
-  { res.render('add-job-listing', { title: 'Add Job Listing' });});
+
 
 app.get('/', (req, res) => {
   res.send('AI Resume Tool API is running!');

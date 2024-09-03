@@ -1,0 +1,61 @@
+.job-entry {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+
+  .job-entry h3 {
+    margin-top: 0;
+  }
+
+  .btn-primary {
+    display: inline-block;
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+  }
+
+  .entry-item {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+ }
+
+ .entry-actions {
+ margin-top: 5px;
+ }
+
+ .btn-edit-entry,
+ .btn-delete-entry,
+ .btn-add-entry {
+ padding: 5px 10px;
+ margin-right: 5px;
+ background-color: #f0f0f0;
+ border: 1px solid #ccc;
+ border-radius: 3px;
+ cursor: pointer;
+ }
+ 
+ .btn-delete-entry {
+ background-color: #ffeeee;
+ }
+
+ .edit-entry-form textarea,
+ .edit-entry-form input[type="text"],
+ .add-entry-form textarea,
+ .add-entry-form input[type="text"] {
+ width: 100%;
+ margin-bottom: 5px;
+ }
+
+.loading {
+display: inline-block;
+padding: 5px 10px;
+background-color: #f0f0f0;
+border-radius: 3px;
+margin-top: 5px;
+}
