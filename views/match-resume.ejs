@@ -1,24 +1,36 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Match Resume</title>
-</head>
-<body>
-    <h1>Match Resume for <%= jobPosting.title %> at <%= jobPosting.company %></h1>
-    <h2>Job Description:</h2>
-    <p><%= jobPosting.description %></p>
-    <h2>Required Skills:</h2>
-    <p><%= jobPosting.required_skills %></p>
-    <h2>Your Matching Work History:</h2>
-    <% workHistory.forEach(entry => { %>
-        <div>
-            <h3><%= entry.position %> at <%= entry.company %></h3>
-            <p><%= entry.start_date %> - <%= entry.end_date %></p>
-            <p><%= entry.description %></p>
-            <p>Skills: <%= entry.skills %></p>
-            <p>Matched Skills: <%= entry.matchedSkills.join(', ') %></p>
-            <p>Match Percentage: <%= entry.matchPercentage.toFixed(2) %>%</p>
-        </div>
-    <% }); %>
-</body>
-</html>
+    <h1>Match Resume to Job Listing</h1>
+    <form id="matchForm" method="POST" action="/match-resume">
+        <label for="jobListingId">Select Job Listing:</label>
+        <select id="jobListingId" name="jobListingId" required>
+            <% jobListings.forEach(job => { %>
+                <option value="<%= job.id %>"><%= job.title %> at <%= job.company %></option>
+            <% }); %>
+        </select>
+        <button type="submit">Match Resume</button>
+    </form>
+
+    <div id="matchResult" style="display: none;">
+        <h2>Match Result</h2>
+        <pre id="aiAnalysis"></pre>
+    </div>
+
+    <!-- Add this line before your existing script tag -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script>
+        document.getElementById('matchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+
+            try {
+                const response = await axios.post(form.action, Object.fromEntries(formData));
+                document.getElementById('aiAnalysis').textContent = response.data.aiAnalysis;
+                document.getElementById('matchResult').style.display = 'block';
+            } catch (error) {
+                console.error('Error matching resume:', error);
+                const errorMessage = error.response?.data?.error || error.message;
+                alert(`Failed to match resume: ${errorMessage}`);
+            }
+        });
+    </script>

@@ -1,0 +1,17 @@
+    <h1>Job Listings</h1>
+    <% if (jobListings && jobListings.length > 0) { %>
+        <ul>
+        <% jobListings.forEach(function(job) { %>
+            <li>
+                <h2><%= job.title %></h2>
+                <p>Company: <%= job.company %></p>
+                <p>Location: <%= job.location %></p>
+                <p>Salary Range: <%= job.salary_range %></p>
+                <p>Description: <%= job.description %></p>
+                <p>Requirements: <%= Array.isArray(job.requirements) ? job.requirements.join(', ') : job.requirements %></p>
+            </li>
+        <% }); %>
+        </ul>
+    <% } else { %>
+        <p>No job listings available.</p>
+    <% } %>
