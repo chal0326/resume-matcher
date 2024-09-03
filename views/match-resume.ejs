@@ -1,5 +1,5 @@
     <h1>Match Resume to Job Listing</h1>
-    <form id="matchForm">
+    <form id="matchForm" method="POST" action="/match-resume">
         <label for="jobListingId">Select Job Listing:</label>
         <select id="jobListingId" name="jobListingId" required>
             <% jobListings.forEach(job => { %>
@@ -14,20 +14,23 @@
         <pre id="aiAnalysis"></pre>
     </div>
 
+    <!-- Add this line before your existing script tag -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
     <script>
         document.getElementById('matchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const jobListingId = document.getElementById('jobListingId').value;
-            const matchResult = document.getElementById('matchResult');
-            const aiAnalysis = document.getElementById('aiAnalysis');
+            const form = e.target;
+            const formData = new FormData(form);
 
             try {
-                const response = await axios.post('/match-resume', { jobListingId });
-                aiAnalysis.textContent = response.data.aiAnalysis;
-                matchResult.style.display = 'block';
+                const response = await axios.post(form.action, Object.fromEntries(formData));
+                document.getElementById('aiAnalysis').textContent = response.data.aiAnalysis;
+                document.getElementById('matchResult').style.display = 'block';
             } catch (error) {
                 console.error('Error matching resume:', error);
-                alert('Failed to match resume. Please try again.');
+                const errorMessage = error.response?.data?.error || error.message;
+                alert(`Failed to match resume: ${errorMessage}`);
             }
         });
     </script>

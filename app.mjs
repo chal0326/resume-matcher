@@ -4,8 +4,9 @@ import expressLayouts from 'express-ejs-layouts';
 import { createClient } from '@supabase/supabase-js';
 import cookieParser from 'cookie-parser';
 import axios from 'axios';
-import { OpenAI } from 'openai';
 import cors from 'cors';
+import OpenAI from "openai";
+
 const app = express();
 // Supabase setup
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
@@ -272,90 +273,17 @@ app.post('/work-history-entry', authenticateUser, async (req, res) => {
   }
 });
 
-// Initialize OpenAI client
-const token = process.env.OPENAI_API_KEY;
-const endpoint = "https://models.inference.ai.azure.com";
-const modelName = "gpt-4o-mini";
+const token = process.env.GITHUB_TOKEN;
+const endpoint = process.env.MODEL_ENDPOINT;
+const modelName = process.env.MODEL_NAME;
 
-function analyzeResumeMatch({ resume, jobDescription }) {
-  // This function simulates the AI analysis
-  // In a real scenario, this would be more complex
-  return JSON.stringify({
-    percentageMatch: "75%",
-    strengths: "Strong technical skills matching job requirements",
-    weaknesses: "Limited experience in the specific industry"
-  });
-}
+console.log('Model Endpoint:', endpoint); // Add this for debugging
+console.log('Model Name:', modelName); // Add this for debugging
 
-const namesToFunctions = {
-  analyzeResumeMatch: (data) => analyzeResumeMatch(data),
-};
-
-// Get all job listings
-app.get('/job-listings', authenticateUser, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('job_listings')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    res.render('job-listings', { title: 'Job Listings', jobListings: data });
-  } catch (error) {
-    console.error('Error fetching job listings:', error);
-    res.status(500).render('job-listings', { 
-      title: 'Job Listings',
-      jobListings: [],
-      error: 'Failed to fetch job listings: ' + error.message
-    });
-  }
-});
-
-// Add a new job listing
-app.post('/job-listings', authenticateUser, async (req, res) => {
-  try {
-    const { title, company, description, requirements, location, salary_range } = req.body;
-    const { data, error } = await supabase
-      .from('job_listings')
-      .insert({ title, company, description, requirements, location, salary_range })
-      .select();
-
-    if (error) throw error;
-
-    res.redirect('/job-listings');
-  } catch (error) {
-    console.error('Error adding job listing:', error);
-    res.status(500).render('add-job-listing', { 
-      title: 'Add Job Listing',
-      error: 'Failed to add job listing: ' + error.message
-    });
-  }
-});
-
-app.get('/match-resume', authenticateUser, async (req, res) => {
-  try {
-    const { data: jobListings, error } = await supabase
-      .from('job_listings')
-      .select('id, title, company')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    res.render('match-resume', { title: 'Match Resume', jobListings });
-  } catch (error) {
-    console.error('Error fetching job listings:', error);
-    res.status(500).render('error', { 
-      title: 'Error',
-      error: 'Failed to fetch job listings: ' + error.message
-    });
-  }
-});
-// Match resume to job listing
 app.post('/match-resume', authenticateUser, async (req, res) => {
   try {
     const { jobListingId } = req.body;
-    const userId = req.user.id;
+    const { user } = req;
 
     // Fetch job listing
     const { data: jobListing, error: jobError } = await supabase
@@ -364,108 +292,41 @@ app.post('/match-resume', authenticateUser, async (req, res) => {
       .eq('id', jobListingId)
       .single();
 
-    if (jobError) throw jobError;
+    if (jobError) throw new Error(`Failed to fetch job listing: ${jobError.message}`);
 
     // Fetch user's work history
-    const { data: workHistory, error: workError } = await supabase
+    const { data: workHistory, error: workHistoryError } = await supabase
       .from('work_history')
       .select(`
+        id,
         company,
         position,
+        start_date,
+        end_date,
         work_history_entries (
+          id,
           description,
           skills
         )
       `)
-      .eq('user_id', userId);
+      .eq('user_id', user.id);
 
-    if (workError) throw workError;
-
-    // Prepare resume and job description for AI analysis
-    const resume = workHistory.map(job => `
-      Company: ${job.company}
-      Position: ${job.position}
-      ${job.work_history_entries.map(entry => `
-        Description: ${entry.description}
-        Skills: ${entry.skills.join(', ')}
-      `).join('\n')}
-    `).join('\n\n');
-
-    const jobDescription = `
-      Title: ${jobListing.title}
-      Company: ${jobListing.company}
-      Description: ${jobListing.description}
-      Requirements: ${jobListing.requirements.join(', ')}
-    `;
-
-    const tool = {
-      "type": "function",
-      "function": {
-        name: "analyzeResumeMatch",
-        description: "Analyzes a resume against a job description and provides a match percentage and analysis.",
-        parameters: {
-          "type": "object",
-          "properties": {
-            "resume": {
-              "type": "string",
-              "description": "The user's resume",
-            },
-            "jobDescription": {
-              "type": "string", 
-              "description": "The job description",
-            },
-          },
-          "required": ["resume", "jobDescription"],
-        }
-      }
-    };
+    if (workHistoryError) throw new Error(`Failed to fetch work history: ${workHistoryError.message}`);
 
     const client = new OpenAI({ baseURL: endpoint, apiKey: token });
 
-    let messages = [
-      { role: "system", content: "You are an AI assistant that analyzes resumes and job descriptions to determine how well they match." },
-      { role: "user", content: `Analyze this resume and job description. Provide a percentage match and a brief explanation of the strengths and weaknesses of the match. Resume: ${resume} Job Description: ${jobDescription}` },
-    ];
-
-    let response = await client.chat.completions.create({
-      messages: messages,
-      tools: [tool],
-      model: modelName
+    const response = await client.chat.completions.create({
+      messages: [
+        { role: "system", content: "You are an AI assistant that analyzes work history and job descriptions to determine how well they match." },
+        { role: "user", content: `Analyze this work history and job description. Provide a percentage match and a brief explanation of the strengths and weaknesses of the match. Work History: ${JSON.stringify(workHistory)} Job Description: ${JSON.stringify(jobListing)}` }
+      ],
+      model: modelName,
+      temperature: 0.7,
+      max_tokens: 1000,
+      top_p: 1
     });
 
-    let aiAnalysis = "";
-
-    if (response.choices[0].finish_reason === "tool_calls") {
-      messages.push(response.choices[0].message);
-
-      if (response.choices[0].message && response.choices[0].message.tool_calls.length === 1) {
-        const toolCall = response.choices[0].message.tool_calls[0];
-        if (toolCall.type === "function") {
-          const functionArgs = JSON.parse(toolCall.function.arguments);
-          console.log(`Calling function \`${toolCall.function.name}\` with arguments ${toolCall.function.arguments}`);
-          const callableFunc = namesToFunctions[toolCall.function.name];
-          const functionReturn = callableFunc(functionArgs);
-          console.log(`Function returned = ${functionReturn}`);
-
-          messages.push({
-            "tool_call_id": toolCall.id,
-            "role": "tool",
-            "name": toolCall.function.name,
-            "content": functionReturn,
-          });
-
-          response = await client.chat.completions.create({
-            messages: messages,
-            tools: [tool],
-            model: modelName
-          });
-
-          aiAnalysis = response.choices[0].message.content;
-        }
-      }
-    } else {
-      aiAnalysis = response.choices[0].message.content;
-    }
+    let aiAnalysis = response.choices[0].message.content;
 
     res.json({ aiAnalysis });
   } catch (error) {
@@ -474,6 +335,20 @@ app.post('/match-resume', authenticateUser, async (req, res) => {
   }
 });
 
+app.get('/match-resume', authenticateUser, async (req, res) => {
+  try {
+    const { data: jobListings, error } = await supabase
+      .from('job_listings')
+      .select('id, title, company');
+
+    if (error) throw error;
+
+    res.render('match-resume', { jobListings });
+  } catch (error) {
+    console.error('Error fetching job listings:', error);
+    res.status(500).render('error', { message: 'Failed to load job listings' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send('AI Resume Tool API is running!');
